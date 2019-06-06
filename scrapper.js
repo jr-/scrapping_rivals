@@ -1,11 +1,14 @@
+const fs = require('fs');
+const { parse } = require('json2csv');
 const puppeteer = require("puppeteer");
 
-(async () => {
+async function scrapping() {
   const browser = await puppeteer.launch();
   const page = await browser.newPage();
   const baseURL = 'https://n.rivals.com/prospect_rankings/rivals150/';
   const baseYear = 2003;
   const maxYear = 2021;
+  // const maxYear = 2003;
 
   let actualYear = baseYear;
   const allPlayers = [];
@@ -35,19 +38,44 @@ const puppeteer = require("puppeteer");
     );
 
     console.log(actualPlayersInformations.length, actualYear);
+   
+    const actualYearStr = actualYear.toString();
 
     for (const actualPlayer of actualPlayersInformations) {
-      actualPlayer.year = actualYear;
+      actualPlayer.year = actualYearStr;
+      actualPlayer.name = actualPlayer.name.replace(/\n/g, ' ');
+      actualPlayer.location = actualPlayer.location.replace(/\n/g, ' ');
+      const charPos = actualPlayer.commitCollege.indexOf('\n');
+
+      if (charPos > 0) {
+          actualPlayer.commitCollege = actualPlayer.commitCollege.substring(0, charPos);
+      }
       allPlayers.push(actualPlayer);
     }
 
     actualYear += 1;
     actualURL = baseURL + actualYear;
   }
-  // format text
-  // name \n => espaço
-  // location \n => espaço
-  // commitCollege pegar até a primeira \
 
   await browser.close();
-})();
+
+  return allPlayers;
+}
+
+(async () => {
+  const allPlayers = await scrapping();
+  console.log(allPlayers.length);
+  console.log(allPlayers);
+  const fields = ['name', 'rank', 'position', 'location', 'commitCollege', 'year'];
+  const opts = { fields };
+  
+  try {
+    const csv = parse(allPlayers, opts);
+    fs.writeFile('players.csv', csv, function (err) {
+        if (err) throw err;
+        console.log('Saved!');
+    });
+  } catch (err) {
+    console.error(err);
+  }
+})();  
